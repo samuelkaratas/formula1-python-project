@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 import scipy.stats as sp
 
+from plotly.offline import plot
+
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -178,4 +180,4 @@ fig.update_layout(
     ]
 )
 
-fig.show()
+plot(fig)
