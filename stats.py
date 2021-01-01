@@ -181,3 +181,43 @@ fig.update_layout(
 )
 
 plot(fig)
+
+# Dict for map drivers by id
+winner_drivers_ids = f1_victories_biggest_winners[['driverId', 'driver']].drop_duplicates()
+winner_drivers_map = {}
+
+for _, row in winner_drivers_ids.iterrows():
+    winner_drivers_map[row['driverId']] = row['driver']   
+
+# Pole positions dataset
+f1_biggest_winners_poles = results.query(f"driverId == {f1_biggest_winners_ids} & grid == 1")[['driverId', 'grid']]
+
+# Driver name mapping
+f1_biggest_winners_poles['driver'] = f1_biggest_winners_poles.driverId.map(winner_drivers_map)
+f1_biggest_winners_poles['color'] = f1_biggest_winners_poles.driver.map(colors)
+
+# Sum cumulative poles
+f1_biggest_winners_poles['total_poles'] = f1_biggest_winners_poles.groupby(['driverId']).cumsum()   
+
+# Total pole positions by winner drivers
+f1_biggest_winners_total_poles = f1_biggest_winners_poles.groupby('driver').total_poles.nlargest(1).sort_values(ascending=False).head(5)
+f1_biggest_winners_total_poles = pd.DataFrame(f1_biggest_winners_total_poles).reset_index()
+
+f1_biggest_winners_total_poles['color'] = f1_biggest_winners_total_poles.driver.map(colors)
+
+# Plot pole positions
+fig = px.bar(
+    f1_biggest_winners_total_poles, 
+    x='driver', 
+    y='total_poles',
+    color='driver',
+    color_discrete_sequence=f1_biggest_winners_total_poles.color
+)
+
+# Bar border line color
+fig.update_traces(dict(marker_line_width=1, marker_line_color="black"))
+
+# Setting title
+fig.update_layout(title_text="Pole positions between the top 5 race winners drivers")
+
+#plot(fig)
