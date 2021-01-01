@@ -154,3 +154,100 @@ plt.show()
 display(HTML(f"<h2>Results</h2>"))
 display(drivers_standings(driverStandings.loc[driverStandings.index.max()].set_index("driverId")).style)
 
+
+#Second figure
+display(HTML(
+    f'<h1 id="constructors">Formula One Constructors\' World Championship &mdash; {YEAR}</h1>'
+))
+
+# Championship position traces
+champ = constructorStandings.groupby("constructorId").position.last().to_frame("Pos")
+champ = champ.join(constructors)
+order = np.argsort(champ.Pos)
+
+color = [TEAM_C[c] for c in champ.index[order]]
+labels = champ.Pos.astype(str) + ". " + champ.label
+
+chart = constructorStandings.pivot("raceId", "constructorId", "points")
+# constructorStandings may have a subset of races (i.e. season in progress) so reindex races
+chart.index = races.reindex(chart.index).name.str.replace("Grand Prix", "GP").rename("Race")
+chart.columns = labels
+
+chart.iloc[:, order].plot(title=f"F1 Constructors\' World Championship — {YEAR}", color=color)
+plt.xticks(range(chart.shape[0]), chart.index, rotation=45)
+plt.grid(axis="x", linestyle="--")
+plt.ylabel("Points")
+plt.legend(**legend_opts)
+plt.tight_layout()
+plt.show()
+
+display(HTML(f"<h2>Results</h2>"))
+display(constructors_standings(constructorStandings.loc[constructorStandings.index.max()].set_index("constructorId")).style)
+
+
+# Third figure
+# Show race traces
+for rid, times in lapTimes.groupby("raceId"):
+
+    race = races.loc[rid]
+    circuit = circuits.loc[race.circuitId]
+    title = "Round {round} — F1 {name} — {year}".format(**race)
+    qstr = race["name"].replace(" ", "+")
+    
+    res = results.query("raceId==@rid").set_index("driverId")
+    res = res.join(drivers.drop("number", 1))
+
+    map_url = "https://www.google.com/maps/search/{lat}+{lng}".format(**circuit)
+    vid_url = f"https://www.youtube.com/results?search_query=f1+{YEAR}+{qstr}"
+
+    lines = [
+        '<h1 id="race{round}">R{round} — {name}</h1>'.format(**race),
+        '<p><b>{date}</b> — '.format(img=WK_IMG, **race),
+        '<b>Circuit:</b> <a href="{url}">{name}</a>, {location}, {country}'.format(**circuit),
+        '<br><a href="{url}">{img} Wikipedia race report</a>'.format(img=WK_IMG, **race),
+        f'<br><a href="{map_url}">{GM_IMG} Map Search</a>',
+        f'<br><a href="{vid_url}">{YT_IMG} YouTube Search</a>',
+    ]
+    
+    display(HTML("\n".join(lines)))
+    
+    chart = times.pivot_table("seconds", "lap", "driverId")
+
+    # reference laptime series
+    basis = chart.median(1).cumsum()
+
+    labels = res.loc[chart.columns].apply(lambda r: "{positionOrder:2.0f}. {display}".format(**r), 1)
+    order = np.argsort(labels)
+    show = chart.iloc[:, order]
+    
+    color = [DRIVER_C[d] for d in show.columns]
+    style = [LINESTYLES[DRIVER_LS[d]] for d in show.columns]
+
+    show = (basis - show.cumsum().T).T
+    show.columns = labels.values[order]
+
+    # fix large outliers; only applies to 1 race - Aus 2016
+    show[show>1000] = np.nan
+    
+    xticks = np.arange(0, len(chart)+1, 2)
+    if len(chart) % 2:  # odd number of laps: nudge last tick to show it
+        xticks[-1] += 1
+
+    show.plot(title=title, style=style, color=color)
+    if show.min().min() < -180:
+        plt.ylim(-180, show.max().max()+3)
+    plt.ylabel("Time Delta (s)")
+    plt.xticks(xticks, xticks)
+    plt.grid(linestyle="--")
+    plt.legend(bbox_to_anchor=(0, -0.2, 1, 1),
+               loc=(0, 0),
+               ncol=6,
+               shadow=True,
+               edgecolor="black",
+               mode="expand",
+               borderaxespad=0.)
+    plt.tight_layout()
+    plt.show()
+    
+    display(HTML(f"<h2>Results</h2>"))
+    display(format_results(res).style)
